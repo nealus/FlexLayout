@@ -3,8 +3,7 @@ import { JSMap } from "./Types";
 
 /** @hidden @internal */
 class AttributeDefinitions {
-
-    attributes: Array<Attribute>;
+    attributes: Attribute[];
     nameToAttribute: JSMap<Attribute>;
 
     constructor() {
@@ -13,7 +12,7 @@ class AttributeDefinitions {
     }
 
     addWithAll(name: string, modelName: string | undefined, defaultValue: any, alwaysWriteJson?: boolean) {
-        let attr = new Attribute(name, modelName, defaultValue, alwaysWriteJson);
+        const attr = new Attribute(name, modelName, defaultValue, alwaysWriteJson);
         this.attributes.push(attr);
         this.nameToAttribute[name] = attr;
         return attr;
@@ -32,7 +31,7 @@ class AttributeDefinitions {
     }
 
     getModelName(name: string) {
-        let conversion = this.nameToAttribute[name];
+        const conversion = this.nameToAttribute[name];
         if (conversion !== undefined) {
             return conversion.modelName;
         }
@@ -53,8 +52,7 @@ class AttributeDefinitions {
             const fromValue = jsonObj[attr.name];
             if (fromValue === undefined) {
                 obj[attr.name] = attr.defaultValue;
-            }
-            else {
+            } else {
                 obj[attr.name] = fromValue;
             }
         });
@@ -62,7 +60,6 @@ class AttributeDefinitions {
 
     update(jsonObj: any, obj: any) {
         this.attributes.forEach((attr) => {
-
             const fromValue = jsonObj[attr.name];
             if (fromValue !== undefined) {
                 obj[attr.name] = fromValue;
@@ -75,7 +72,6 @@ class AttributeDefinitions {
             obj[attr.name] = attr.defaultValue;
         });
     }
-
 }
 
 /** @hidden @internal */

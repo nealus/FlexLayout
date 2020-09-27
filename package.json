@@ -1,38 +1,61 @@
 {
-  "name": "flexlayout-react",
-  "version": "0.3.1",
-  "description": "A multi-tab layout manager",
-  "main": "lib/index.js",
-  "types": "./declarations/index.d.ts",
-  "scripts": {
-    "test": "jasmine",
-    "build": "npm run build:commonjs && npm run build:umd && npm run build:umd:min",
-    "build:commonjs": "tsc -p tsconfig2.json",
-    "build:umd": "webpack --config webpack_build.config.js",
-    "build:umd:min": "webpack -p --config webpack_build_min.config.js",
-    "doc": "typedoc --out typedoc --mode file --exclude \"**/examples/**/*.tsx\"  --readme none "
-  },
-  "author": "Caplin Systems Ltd",
-  "repository": "https://github.com/caplin/FlexLayout",
-  "license": "ISC",
-  "peerDependencies": {
-    "react": "^16.4.2",
-    "react-dom": "^16.4.2"
-  },
-  "devDependencies": {
-    "@types/jasmine": "^2.8.8",
-    "@types/react": "^16.4.9",
-    "@types/react-dom": "^16.0.7",
-    "awesome-typescript-loader": "^5.2.0",
-    "jasmine": "^3.2.0",
-    "react": "^16.4.2",
-    "react-dom": "^16.4.2",
-    "source-map-loader": "^0.2.3",
-    "typedoc": "^0.11.1",
-    "typescript": "^3.0.0",
-    "webpack": "^4.16.5",
-    "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.5"
-  },
-  "dependencies": {}
+    "name": "flexlayout-react",
+    "version": "0.5.2",
+    "description": "A multi-tab docking layout manager",
+    "main": "lib/index.js",
+    "types": "./declarations/index.d.ts",
+    "keywords": [
+        "react",
+        "layout",
+        "dock",
+        "popout",
+        "tabs",
+        "drag-and-drop",
+        "tabset",
+        "splitter",
+        "drag",
+        "drop",
+        "reactjs",
+        "react-dom"
+    ],
+    "private": true,
+    "workspaces": [
+        "example"
+    ],
+    "scripts": {
+        "start:example": "yarn link & yarn workspace example start",
+        "devserver": "webpack-dev-server",
+        "build": "npm run build:commonjs && npm run build:umd && npm run build:umd:min && npm run css",
+        "build:commonjs": "tsc -p tsconfig2.json",
+        "build:umd": "webpack --config webpack_build.config.js",
+        "build:umd:min": "webpack --minimize --config webpack_build_min.config.js",
+        "test": "jasmine",
+        "lint:eslint": "eslint src/*",
+        "doc": "typedoc --out typedoc --mode file --exclude \"**/examples/**/*.tsx\" --stripInternal --disableSources --excludePrivate --excludeProtected --readme none ",
+        "css": "sass style/light.scss style/light.css && sass style/dark.scss style/dark.css"
+    },
+    "author": "Caplin Systems Ltd",
+    "repository": "https://github.com/caplin/FlexLayout",
+    "license": "ISC",
+    "peerDependencies": {
+        "react": "^16.13.1",
+        "react-dom": "^16.13.1"
+    },
+    "eslintConfig": {
+        "extends": "react-app"
+    },
+    "devDependencies": {
+        "@types/jasmine": "^3.5.14",
+        "@types/react": "16.9.35",
+        "@types/react-dom": "^16.9.8",
+        "awesome-typescript-loader": "^5.2.0",
+        "jasmine": "^3.6.1",
+        "prettier": "^2.1.1",
+        "react-scripts": "^3.4.3",
+        "sass": "^1.26.10",
+        "source-map-loader": "^1.1.0",
+        "typedoc": "^0.19.0",
+        "typescript": "^3"
+    },
+    "dependencies": {}
 }

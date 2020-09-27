@@ -1,0 +1,70 @@
+0.5.2
+Fixed issues caused by double touch/mouse events in IOS
+Prevented IOS scroll during drag in demo app.
+Added extra option to onRenderTab to allow name of item in overflow menu to be set.
+New closeType option for tabs
+The maximized tabset now sets others to display:none rather than use z-index
+Disable maximize if only one tabset
+Splitters will now default to 8 on desktop and 12 on mobile (so they can be tapped more easily)
+Close element is enlarged on mobile 
+
+0.5.1
+Various small fixes
+
+0.5.0
+Overflowing tabs now scroll to keep the selected tab in view, 
+they can also be manually scrolled using the mouse wheel.
+Now works on scrolling page.
+NOTE: several css classes with names starting with flexlayout__tabset_header... have
+been renamed to flexlayout__tabset_tabbar...
+
+0.4.9
+Keep selected tab in tabset/border when another tab is moved out.
+
+0.4.8
+Minimum size attributes on tabset and border.
+Extra css classes on elements for border and splitter styling.
+
+0.4.7
+Added font property.
+Font now defaults to medium.
+Tabs now auto adjust to the current font.
+Added fontSize dropdown to demo.
+Modified css for above fontSize changes and to remove some fixed sizes.
+New attributes to control auto selection of tabs.
+
+0.4.6
+Added icons prop to allow default icons to be replaced.
+Added tabLocation attribute to tabsets to allow top and bottom tab placement.
+Modified css, default font is now 14px.
+
+0.4.5
+Fixed use of global objects for use when serverside rendering
+Added error boundary around tab contents to prevent tab rendering exception crashing the app
+
+0.4.4
+Changed all components except Layout to use React Hooks.
+Popouts now wait for style sheets to load.
+Fixed problem rendering popouts in Safari.
+
+0.4.3
+Fix addTabWithDragAndDrop not working since 0.4.0
+
+0.4.2
+Use Sass to generate light and dark themes
+
+0.4.1
+Copy styles into popout tabs
+
+0.4.0
+Added ability to popout tabs into new browser windows.
+Press the 'reload from file' button in the demo app to load new layouts with the popout attribute.
+
+0.3.11
+Added overflow menu to border tabs
+Fixed issues running on IE11
+
+0.3.10
+Removed deprecated React lifecycle methods, will now work
+in React strict mode without warnings (for example, in apps
+created with Create React App).

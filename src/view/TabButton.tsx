@@ -1,181 +1,200 @@
 import * as React from "react";
-import * as ReactDOM from "react-dom";
-import Rect from "../Rect";
+import { I18nLabel } from "../I18nLabel";
 import Actions from "../model/Actions";
 import TabNode from "../model/TabNode";
 import TabSetNode from "../model/TabSetNode";
-import Layout from "./Layout";
+import Rect from "../Rect";
+import { IIcons, ILayoutCallbacks } from "./Layout";
+import { ICloseType } from "../model/ICloseType";
+import { CLASSES } from "../Types";
 
 /** @hidden @internal */
 export interface ITabButtonProps {
-    layout: Layout,
-    node: TabNode,
-    show: boolean,
-    selected: boolean,
-    height: number
+    layout: ILayoutCallbacks;
+    node: TabNode;
+    show: boolean;
+    selected: boolean;
+    height: number;
+    iconFactory?: (node: TabNode) => React.ReactNode | undefined;
+    titleFactory?: (node: TabNode) => React.ReactNode | undefined;
+    icons?: IIcons;
 }
 
 /** @hidden @internal */
-export class TabButton extends React.Component<ITabButtonProps, any> {
-    selfRef?: HTMLDivElement;
+export const TabButton = (props: ITabButtonProps) => {
+    const { layout, node, show, selected, iconFactory, titleFactory, icons } = props;
+    const selfRef = React.useRef<HTMLDivElement | null>(null);
+    const contentRef = React.useRef<HTMLInputElement | null>(null);
+    const contentWidth = React.useRef<number>(0);
+    const [editing, setEditing] = React.useState<boolean>(false);
 
-    contentWidth: number = 0;
-    contentRef?: Element;
+    const onMouseDown = (event: React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement>) => {
+        const message = layout.i18nName(I18nLabel.Move_Tab, node.getName());
+        layout.dragStart(event, message, node, node.isEnableDrag(), onClick, onDoubleClick);
+    };
 
-    constructor(props: ITabButtonProps) {
-        super(props);
-        this.state = { editing: false };
-        this.onEndEdit = this.onEndEdit.bind(this);
-    }
+    const onClick = () => {
+        layout.doAction(Actions.selectTab(node.getId()));
+    };
 
-    onMouseDown(event: Event) {
-        this.props.layout.dragStart(event, "Move: " + this.props.node.getName(), this.props.node, this.props.node.isEnableDrag(), this.onClick.bind(this), this.onDoubleClick.bind(this));
-    }
-
-    onClick(event: Event) {
-        const node = this.props.node;
-        this.props.layout.doAction(Actions.selectTab(node.getId()));
-    }
-
-    onDoubleClick(event: Event) {
-        if (this.props.node.isEnableRename()) {
-            this.setState({ editing: true });
-            document.body.addEventListener("mousedown", this.onEndEdit);
-            document.body.addEventListener("touchstart", this.onEndEdit);
-        }
-        else {
-            let parentNode = this.props.node.getParent() as TabSetNode;
+    const onDoubleClick = (event: Event) => {
+        if (node.isEnableRename()) {
+            setEditing(true);
+            layout.getCurrentDocument()!.body.addEventListener("mousedown", onEndEdit);
+            layout.getCurrentDocument()!.body.addEventListener("touchstart", onEndEdit);
+        } else {
+            const parentNode = node.getParent() as TabSetNode;
             if (parentNode.isEnableMaximize()) {
-                this.props.layout.maximize(parentNode);
+                layout.maximize(parentNode);
             }
-
         }
-    }
+    };
 
-    onEndEdit(event: Event) {
-        if (event.target !== this.contentRef) {
-            this.setState({ editing: false });
-            document.body.removeEventListener("mousedown", this.onEndEdit);
-            document.body.removeEventListener("touchstart", this.onEndEdit);
+    const onEndEdit = (event: Event) => {
+        if (event.target !== contentRef.current!) {
+            setEditing(false);
+            layout.getCurrentDocument()!.body.removeEventListener("mousedown", onEndEdit);
+            layout.getCurrentDocument()!.body.removeEventListener("touchstart", onEndEdit);
         }
-    }
+    };
 
-    onClose(event: React.MouseEvent<HTMLDivElement>) {
-        const node = this.props.node;
-        this.props.layout.doAction(Actions.deleteTab(node.getId()));
-    }
+    const isClosable = () => {
+        const closeType = node.getCloseType();
+        if (selected || closeType === ICloseType.Always) {
+            return true;
+        }
+        if (closeType === ICloseType.Visible) {
+            // not selected but x should be visible due to hover
+            if (window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+                return true;
+            }
+        }
+        return false;
+    };
 
-    onCloseMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    const onClose = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (isClosable()) {
+            layout.doAction(Actions.deleteTab(node.getId()));
+        } else {
+            onClick();
+        }
+    };
+
+    const onCloseMouseDown = (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
         event.stopPropagation();
-    }
+    };
 
-    componentDidMount() {
-        this.updateRect();
-    }
-
-    componentDidUpdate() {
-        this.updateRect();
-        if (this.state.editing) {
-            (this.contentRef as HTMLInputElement).select();
+    React.useLayoutEffect(() => {
+        updateRect();
+        if (editing) {
+            (contentRef.current! as HTMLInputElement).select();
         }
-    }
+    });
 
-    updateRect() {
+    const updateRect = () => {
         // record position of tab in node
-        const clientRect = (ReactDOM.findDOMNode(this.props.layout) as Element).getBoundingClientRect();
-        const r = (this.selfRef as Element).getBoundingClientRect();
-        this.props.node._setTabRect(new Rect(r.left - clientRect.left, r.top - clientRect.top, r.width, r.height));
-        this.contentWidth = (this.contentRef as Element).getBoundingClientRect().width;
-    }
+        const layoutRect = layout.getDomRect();
+        const r = selfRef.current!.getBoundingClientRect();
+        node._setTabRect(new Rect(r.left - layoutRect.left, r.top - layoutRect.top, r.width, r.height));
+        contentWidth.current = contentRef.current!.getBoundingClientRect().width;
+    };
 
-
-    onTextBoxMouseDown(event: React.MouseEvent<HTMLInputElement>) {
-        //console.log("onTextBoxMouseDown");
+    const onTextBoxMouseDown = (event: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+        // console.log("onTextBoxMouseDown");
         event.stopPropagation();
+    };
+
+    const onTextBoxKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        // console.log(event, event.keyCode);
+        if (event.keyCode === 27) {
+            // esc
+            setEditing(false);
+        } else if (event.keyCode === 13) {
+            // enter
+            setEditing(false);
+            layout.doAction(Actions.renameTab(node.getId(), (event.target as HTMLInputElement).value));
+        }
+    };
+
+    const cm = layout.getClassName;
+    const parentNode = node.getParent() as TabSetNode;
+
+    let baseClassName = CLASSES.FLEXLAYOUT__TAB_BUTTON;
+    let classNames = cm(baseClassName);
+    classNames += " " + cm(baseClassName + "_" + parentNode.getTabLocation());
+
+    if (selected) {
+        classNames += " " + cm(baseClassName + "--selected");
+    } else {
+        classNames += " " + cm(baseClassName + "--unselected");
     }
 
-    onTextBoxKeyPress(event: React.KeyboardEvent<HTMLInputElement>) {
-        //console.log(event, event.keyCode);
-        if (event.keyCode === 27) { // esc
-            this.setState({ editing: false });
-        }
-        else if (event.keyCode === 13) { // enter
-            this.setState({ editing: false });
-            const node = this.props.node;
-            this.props.layout.doAction(Actions.renameTab(node.getId(), (event.target as HTMLInputElement).value));
-        }
+    if (node.getClassName() !== undefined) {
+        classNames += " " + node.getClassName();
     }
 
-    doRename(node: TabNode, newName: string) {
-        this.props.layout.doAction(Actions.renameTab(node.getId(), newName));
+    let leadingContent = iconFactory ? iconFactory(node) : undefined;
+    const titleContent = (titleFactory ? titleFactory(node) : undefined) || node.getName();
+
+    if (typeof leadingContent === undefined && typeof node.getIcon() !== undefined) {
+        leadingContent = <img src={node.getIcon()} alt="leadingContent" />;
     }
 
-    render() {
-        let cm = this.props.layout.getClassName;
+    let name = node.getName();
+    let buttons: any[] = [];
 
-        let classNames = cm("flexlayout__tab_button");
-        const node = this.props.node;
+    // allow customization of leading contents (icon) and contents
+    const renderState = { leading: leadingContent, content: titleContent, name, buttons };
+    layout.customizeTab(node, renderState);
 
-        if (this.props.selected) {
-            classNames += " " + cm("flexlayout__tab_button--selected");
-        }
-        else {
-            classNames += " " + cm("flexlayout__tab_button--unselected");
-        }
+    node._setRenderedName(renderState.name);
 
-        if (this.props.node.getClassName() !== undefined) {
-            classNames += " " + this.props.node.getClassName();
-        }
+    let content = (
+        <div ref={contentRef} className={cm(CLASSES.FLEXLAYOUT__TAB_BUTTON_CONTENT)}>
+            {renderState.content}
+        </div>
+    );
+    const leading = <div className={cm(CLASSES.FLEXLAYOUT__TAB_BUTTON_LEADING)}>{renderState.leading}</div>;
 
-        let leadingContent = undefined;
-
-        if (node.getIcon() !== undefined) {
-            leadingContent = <img src={node.getIcon()} />;
-        }
-
-        // allow customization of leading contents (icon) and contents
-        const renderState = { leading: leadingContent, content: node.getName() };
-        this.props.layout.customizeTab(node, renderState);
-
-        let content = <div ref={ref => this.contentRef = (ref===null)?undefined:ref} className={cm("flexlayout__tab_button_content")}>{renderState.content}</div>;
-        const leading = <div className={cm("flexlayout__tab_button_leading")}>{renderState.leading}</div>;
-
-        if (this.state.editing) {
-            const contentStyle = { width: this.contentWidth + "px" };
-            content = <input style={contentStyle}
-                ref={ref => this.contentRef = (ref===null)?undefined:ref}
-                className={cm("flexlayout__tab_button_textbox")}
+    if (editing) {
+        const contentStyle = { width: contentWidth + "px" };
+        content = (
+            <input
+                style={contentStyle}
+                ref={contentRef}
+                className={cm(CLASSES.FLEXLAYOUT__TAB_BUTTON_TEXTBOX)}
                 type="text"
-                autoFocus
+                autoFocus={true}
                 defaultValue={node.getName()}
-                onKeyDown={this.onTextBoxKeyPress.bind(this)}
-                onMouseDown={this.onTextBoxMouseDown.bind(this)}
-                onTouchStart={this.onTextBoxMouseDown.bind(this)}
-            />;
-        }
+                onKeyDown={onTextBoxKeyPress}
+                onMouseDown={onTextBoxMouseDown}
+                onTouchStart={onTextBoxMouseDown}
+            />
+        );
+    }
 
-        let closeButton = undefined;
-        if (this.props.node.isEnableClose()) {
-            closeButton = <div className={cm("flexlayout__tab_button_trailing")}
-                onMouseDown={this.onCloseMouseDown.bind(this)}
-                onClick={this.onClose.bind(this)}
-                onTouchStart={this.onCloseMouseDown.bind(this)}
-            />;
-        }
+    if (node.isEnableClose()) {
+        const closeTitle = layout.i18nName(I18nLabel.Close_Tab);
+        buttons.push(
+            <div key="close" title={closeTitle} className={cm(CLASSES.FLEXLAYOUT__TAB_BUTTON_TRAILING)} onMouseDown={onCloseMouseDown} onClick={onClose} onTouchStart={onCloseMouseDown}>
+                {icons?.close}
+            </div>
+        );
+    }
 
-        return <div ref={ref => this.selfRef = (ref===null)?undefined:ref}
+    return (
+        <div
+            ref={selfRef}
             style={{
-                visibility: this.props.show ? "visible" : "hidden",
-                height: this.props.height
+                visibility: show ? "visible" : "hidden",
             }}
             className={classNames}
-            onMouseDown={this.onMouseDown.bind(this)}
-            onTouchStart={this.onMouseDown.bind(this)}>
+            onMouseDown={onMouseDown}
+            onTouchStart={onMouseDown}
+        >
             {leading}
             {content}
-            {closeButton}
-        </div>;
-    }
-}
-
-// export default TabButton;
+            {buttons}
+        </div>
+    );
+};

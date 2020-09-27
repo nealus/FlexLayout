@@ -1,12 +1,12 @@
 # FlexLayout
 
-FlexLayout is a layout manager that arranges React components in multiple tab sets, these can be resized and moved.
+FlexLayout is a layout manager that arranges React components in multiple tab sets, tabs can be resized and moved.
 
-![FlexLayout Demo Screenshot](/../screenshots/github_images/v0.20/demo1.png?raw=true "FlexLayout Demo Screenshot")
+![FlexLayout Demo Screenshot](/../screenshots/github_images/v0.5/demo1.png?raw=true "FlexLayout Demo Screenshot")
 
-[Run the Demo](https://rawgit.com/caplin/FlexLayout/demos/demos/v0.30/demo/index.html)
+[Run the Demo](https://rawgit.com/caplin/FlexLayout/demos/demos/v0.5/demo/index.html)
 
-Try it now using [JSFiddle](https://jsfiddle.net/9x6hecdw/1)
+Try it now using [JSFiddle](https://jsfiddle.net/9x6hecdw/)
 
 <!-- [API Doc](./typedoc/index.html) -->
 
@@ -21,20 +21,21 @@ Features:
 *	tabset dragging (move all the tabs in a tabset in one operation)
 *	dock to tabset or edge of frame
 *	maximize tabset (double click tabset header or use icon)
-*	tab overflow (show menu when tabs overflow)
+*	tab overflow (show menu when tabs overflow, scroll tabs using mouse wheel)
 *   border tabsets
+*   popout tabs into new browser windows (only enabled in latest browsers)
 *	submodels, allow layouts inside layouts
 *	tab renaming (double click tab text to rename)
 *	themeing - light and dark
 *	touch events - works on mobile devices (iPad, Android)
 *   add tabs using drag, indirect drag, add to active tabset, add to tabset by id
-*   preferred pixel size tabsets
+*   preferred pixel size tabsets (try to keep their size when window resizes)
 *   headed tabsets
 *	tab and tabset attributes: enableHeader, enableTabStrip, enableDock, enableDrop...
 *	customizable tabs and tabset header rendering
 *   esc cancels drag
 *	typescript type declarations included
-*	supports overriding css class names via the classNameProvider prop, for use in css modules
+*	supports overriding css class names via the classNameMapper prop, for use in css modules
 
 ## Installation
 
@@ -57,7 +58,7 @@ import FlexLayout from "flexlayout-react";
 Include the light or dark style in your html:
 
 ```
-<link rel="stylesheet" href="node_modules/flexLayout-react/style/dark.css" />
+<link rel="stylesheet" href="node_modules/flexlayout-react/style/dark.css" />
 ```
 
 ## Usage
@@ -65,14 +66,22 @@ Include the light or dark style in your html:
 The `<Layout>` component renders the tabsets and splitters, it takes the following props:
 
 
-| Prop       | Required/Optional           | Description  |
-| ------------- |:-------------:| -----|
-| model    | required | the layout model  |
-| factory      | required | a factory function for creating React components |
-| onAction | optional     |  function called whenever the layout generates an action to update the model (allows for intercepting actions before they are dispatched to the model, for example, asking the user to confirm a tab close) |
-| onRenderTab | optional     |  function called when rendering a tab, allows leading (icon) and content sections to be customized |
-| onRenderTabSet | optional     |  function called when rendering a tabset, allows header and buttons to be customized |
-| classNameMapper | optional     |  function called with default css class name, return value is class name that will be used. Mainly for use with css modules.|
+| Prop            | Required/Optional | Description       |
+| --------------- |:-----------------:| ----------------- |
+| model           | required          | the layout model  |
+| factory         | required          | a factory function for creating React components |
+| font        | optional          | the tab font (overrides value in css). Example: font={{size:"12px", style:"italic"}}|
+| iconFactory     | optional          | a factory function for creating icon components for tab bar buttons |
+| titleFactory    | optional          | a factory function for creating title components for tab bar buttons |
+| icons           | optional          | object mapping keys among `close`, `maximize`, `restore`, `more`, `popout` to React nodes to use in place of the default icons |
+| onAction        | optional          | function called whenever the layout generates an action to update the model (allows for intercepting actions before they are dispatched to the model, for example, asking the user to confirm a tab close.) Returning `undefined` from the function will halt the action, otherwise return the action to continue |
+| onRenderTab     | optional          | function called when rendering a tab, allows leading (icon), content section, buttons and name used in overflow menu to be customized |
+| onRenderTabSet  | optional          | function called when rendering a tabset, allows header and buttons to be customized |
+| onModelChange   | optional          | function called when model has changed |
+| classNameMapper | optional          | function called with default css class name, return value is class name that will be used. Mainly for use with css modules.|
+| i18nMapper      | optional          | function called for each I18nLabel to allow user translation, currently used for tab and tabset move messages, return undefined to use default values |
+| supportsPopout  | optional          | if left undefined will do simple check based on userAgent |
+| popoutURL      | optional          | URL of popout window relative to origin, defaults to popout.html |
 
 The model is tree of Node objects that define the structure of the layout.
 
@@ -141,7 +150,7 @@ class Main extends React.Component {
         this.state = {model: FlexLayout.Model.fromJson(json)};
     }
 
-    factory(node) {
+    factory = (node) => {
         var component = node.getComponent();
         if (component === "button") {
             return <button>{node.getName()}</button>;
@@ -150,7 +159,7 @@ class Main extends React.Component {
 
     render() {
         return (
-            <FlexLayout.Layout model={this.state.model} factory={this.factory.bind(this)}/>
+            <FlexLayout.Layout model={this.state.model} factory={this.factory}/>
         )
     }
 }
@@ -161,7 +170,7 @@ ReactDOM.render(<Main/>, document.getElementById("container"));
 
 The above code would render two tabsets horizontally each containing a single tab that hosts a button component. The tabs could be moved and resized by dragging and dropping. Additional grids could be added to the layout by sending actions to the model.
 
-Try it now using [JSFiddle](https://jsfiddle.net/9x6hecdw/1) 
+Try it now using [JSFiddle](https://jsfiddle.net/9x6hecdw/) 
 
 
 The model is built up using 4 types of 'node':
@@ -264,6 +273,37 @@ tabs or drag and drop).
 ```
  global: {tabSetEnableTabStrip:false},
 ```
+## Floating Tabs (Popouts)
+
+(Press the 'reload from file' button in the demo app to load new layouts with the popout attribute)
+
+Note: this feature only works for Chrome, Firefox, Safari, latest Edge (the Chrome based one) and Opera, it does
+NOT work for any version of IE or the previous version of Edge. For unsupported browsers the popout icons
+will not be shown and any saved layout with popouts will show with all their tabs in the main layout.
+
+For supported browsers tabs can be rendered into external browser windows (for use in multi-monitor setups)
+by configuring them with the enableFloat attribute. When this attribute is present
+an additional icon is shown in the tab header bar allowing the tab to be popped out
+into an external window.
+
+For popouts to work there needs to be an additional html page 'popout.html' hosted
+at the same location as the main page (copy the one from examples/demo). The popout.html is the host page for the
+popped out tab, the styles from the main page will be copied into it at runtime.
+
+Because popouts are rendering into a different document to the main layout any code in the popped out
+tab that uses the global document or window objects will not work correctly (for example custom popup menus), 
+they need to instead use the document/window of the popout. To get the document/window of the popout use the
+following method on one of the elements rendered in the popout (for example a ref or target in an event handler):
+
+```
+    const currentDocument = this.selfRef.current.ownerDocument;
+    const currentWindow = currentDocument.defaultView!;
+```
+
+In the above code selfRef is a React ref to the toplevel element in the tab being rendered.
+
+Note: some libraries already support popout windows by allowing you to specify the document to use, 
+for example see the getDocument() callback in agGrid at https://www.ag-grid.com/javascript-grid-callbacks/
 
 ## Global Config attributes
 
@@ -275,24 +315,36 @@ Attributes allowed in the 'global' element
 | splitterSize | 8 | |
 | enableEdgeDock | true | |
 | tabEnableClose | true | |
+| tabCloseType | 1 | see values in ICloseType |
 | tabEnableDrag | true | |
 | tabEnableRename | true | |
+| tabEnableFloat | false | enable popouts in all tabs (in popout capable browser) |
 | tabClassName | null | |
 | tabIcon | null | |
 | tabEnableRenderOnDemand | true | |
+| tabDragSpeed | 0.3 | CSS transition speed of drag outlines (in seconds) |
 | tabSetEnableDeleteWhenEmpty | true | |
 | tabSetEnableDrop | true | |
 | tabSetEnableDrag | true | |
 | tabSetEnableDivide | true | |
 | tabSetEnableMaximize | true | |
+| tabSetAutoSelectTab | true | whether to select new/moved tabs in tabset |
 | tabSetClassNameTabStrip | null | |
 | tabSetClassNameHeader | null | |
 | tabSetEnableTabStrip | true | |
-| tabSetHeaderHeight | 20 | |
-| tabSetTabStripHeight | 20 | |
-| borderBarSize | 25 | |
+| tabSetHeaderHeight | 0 | Height of tabset header in pixels, if left as 0 then the value will be calculated from the current fontSize |
+| tabSetTabStripHeight | 0 | Height of tabset tab bar in pixels, if left as 0 then the value will be calculated from the current fontSize |
+| borderBarSize | 0 | Size of the border bars in pixels, if left as 0 then the value will be calculated from the current fontSize |
 | borderEnableDrop | true | |
+| borderAutoSelectTabWhenOpen | true | whether to select new/moved tabs in border when the border is already open |
+| borderAutoSelectTabWhenClosed | false | whether to select new/moved tabs in border when the border is curently closed |
 | borderClassName | null | |
+| borderSize | 200 | |
+| borderMinSize | 0 | |
+| tabSetMinHeight | 0 | |
+| tabSetMinWidth | 0 | |
+| tabSetTabLocation | top | show tabs in location top or bottom |
+
 
 ## Row Attributes
 
@@ -321,8 +373,11 @@ Inherited defaults will take their value from the associated global attributes (
 | config | null | a place to hold json config for the hosted component |
 | id | auto generated | |
 | enableClose | *inherited* | |
+| closeType | *inherited* | |
 | enableDrag | *inherited* | |
 | enableRename | *inherited* | |
+| enableFloat | *inherited* | enable popout (in popout capable browser) |
+| floating | false | |
 | className | *inherited* | |
 | icon | *inherited* | |
 | enableRenderOnDemand | *inherited* | |
@@ -355,11 +410,15 @@ Note: tabsets can be dynamically created as tabs are moved and deleted when all 
 | enableDrag | *inherited* | |
 | enableDivide | *inherited* | |
 | enableMaximize | *inherited* | |
+| autoSelectTab | *inherited* | whether to select new/moved tabs in tabset |
 | classNameTabStrip | *inherited* | |
 | classNameHeader | *inherited* | |
 | enableTabStrip | *inherited* | |
 | headerHeight | *inherited* | |
 | tabStripHeight | *inherited* | |
+| tabLocation | *inherited* | show tabs in location top or bottom |
+| minHeight | *inherited* | |
+| minWidth | *inherited* | |
 
 ## Border Attributes
 
@@ -371,13 +430,16 @@ Inherited defaults will take their value from the associated global attributes (
 | Attribute | Default | Description  |
 | ------------- |:-------------:| -----|
 | type | border | |
-| size | 200 | size of the tab body when selected |
+| size | *inherited* | size of the tab body when selected |
+| minSize | *inherited* |  |
 | selected | -1 | -1 is the unselected value|
 | id | auto generated | border_ + border name e.g. border_left |
 | show | true | show/hide this border |
 | children | *required* | a list of tab nodes |
 | barSize | *inherited* | |
 | enableDrop | *inherited* | |
+| autoSelectTabWhenOpen | *inherited* | whether to select new/moved tabs in border when the border is already open |
+| autoSelectTabWhenClosed | *inherited* | whether to select new/moved tabs in border when the border is currently closed |
 | className | *inherited* | |
 
 
@@ -403,21 +465,24 @@ adjusting the layout easier on a small device.
 
 | Action Creator | Description  |
 | ------------- | -----|
-|	Actions.addNode(newNodeJson, toNodeId, location, index) | add a new tab node to the given tabset node  |
-|	Actions.moveNode(fromNodeId, toNodeId, location, index) | move a tab node from its current location to the new node and location |
+|	Actions.addNode(newNodeJson, toNodeId, location, index, select?) | add a new tab node to the given tabset node; `select` specifies whether to select new tab, defaulting to `autoSelectTab` attribute |
+|	Actions.moveNode(fromNodeId, toNodeId, location, index, select?) | move a tab node from its current location to the new node and location; `select` specifies whether to select tab, defaulting to new tabset's `autoSelectTab` attribute |
 |	Actions.deleteTab(tabNodeId) | delete the given tab |
+|	Actions.renameTab(tabNodeId, newName) | rename the given tab |
 |	Actions.selectTab(tabNodeId) | select the given tab |
 |	Actions.setActiveTabset(tabsetNodeId) | set the tabset as the active tabset |
 |	Actions.adjustSplit(splitterNodeId, value) | adjust the size of the given splitter |
+|	Actions.adjustBorderSplit(borderNodeId, pos) | updates the size of the given border node |
 |	Actions.maximizeToggle(tabsetNodeId) | toggles whether the given tabset node is maximized |
 |	Actions.updateModelAttributes(attributes) | updates the global attributes |
 |	Actions.updateNodeAttributes(nodeId, attributes) | updates the attributes of the given node |
-|	Actions.adjustBorderSplit(borderNodeId, pos) | updates the size of the given border node |
+|	Actions.floatTab(nodeId) | popout the tab into a floating browser window |
+|	Actions.unFloatTab(nodeId) | restore a popped out tab to the main layout |
 
 for example:
 
 ```
-model.doAction(Actions.addNode({type:"tab", component:"grid", name:"a grid", id:"5"}, "1", DropLocation.CENTER, 0));
+model.doAction(Actions.addNode({type:"tab", component:"grid", name:"a grid", id:"5"}, "1", DockLocation.CENTER, 0));
 ```
 This would add a new grid component to the center of tabset with id "1" and at the 0'th tab position (use value -1 to add to the end of the tabs).
 Note: you can get the id of a node using the method node.getId(), if an id wasn't assigned when the node was created then one will be created for you of the form #<next available id> (e.g. #1, #2 ...).
@@ -454,9 +519,9 @@ Example:
         let config = this.props.node.getConfig();
 
         // save state in flexlayout node tree
-        this.props.node.setEventListener("save", function (p) {
+        this.props.node.setEventListener("save", (p) => {
              config.subject = this.subject;
-        }.bind(this));
+        };
     }
 
 ```
