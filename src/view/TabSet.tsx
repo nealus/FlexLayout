@@ -25,6 +25,7 @@ export const TabSet = (props: ITabSetProps) => {
 
     const toolbarRef = React.useRef<HTMLDivElement | null>(null);
     const overflowbuttonRef = React.useRef<HTMLButtonElement | null>(null);
+    const tabbarInnerRef = React.useRef<HTMLDivElement | null>(null);
 
     const { selfRef, position, userControlledLeft, hiddenTabs, onMouseWheel } = useTabOverflow(node, Orientation.HORZ, toolbarRef);
 
@@ -54,23 +55,8 @@ export const TabSet = (props: ITabSetProps) => {
         event.stopPropagation();
     };
 
-    const canMaximize = () => {
-        if (node.isEnableMaximize()) {
-            // always allow maximize toggle if already maximized
-            if (node.getModel().getMaximizedTabset() === node) {
-                return true;
-            }
-            // only one tabset, so disable
-            if (node.getParent() === node.getModel().getRoot() && node.getModel().getRoot().getChildren().length === 1) {
-                return false;
-            }
-            return true;
-        }
-        return false;
-    };
-
     const onMaximizeToggle = () => {
-        if (canMaximize()) {
+        if (node.canMaximize()) {
             layout.maximize(node);
         }
     };
@@ -82,13 +68,18 @@ export const TabSet = (props: ITabSetProps) => {
     };
 
     const onDoubleClick = (event: Event) => {
-        if (canMaximize()) {
+        if (node.canMaximize()) {
             layout.maximize(node);
         }
     };
 
     // Start Render
     const cm = layout.getClassName;
+
+    // tabbar inner can get shifted left via tab rename, this resets scrollleft to 0
+    if (tabbarInnerRef.current !== null && tabbarInnerRef.current!.scrollLeft !== 0) {
+        tabbarInnerRef.current.scrollLeft = 0;
+    }
 
     const selectedTabNode: TabNode = node.getSelectedNode() as TabNode;
     let style = node._styleWithPosition();
@@ -160,7 +151,7 @@ export const TabSet = (props: ITabSetProps) => {
             </button>
         );
     }
-    if (canMaximize()) {
+    if (node.canMaximize()) {
         const minTitle = layout.i18nName(I18nLabel.Restore);
         const maxTitle = layout.i18nName(I18nLabel.Maximize);
         buttons.push(
@@ -228,7 +219,7 @@ export const TabSet = (props: ITabSetProps) => {
 
         tabStrip = (
             <div className={tabStripClasses} style={tabStripStyle} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
-                <div className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
+                <div ref={tabbarInnerRef} className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
                     <div
                         style={{ left: position }}
                         className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER_ + node.getTabLocation())}
@@ -247,7 +238,7 @@ export const TabSet = (props: ITabSetProps) => {
         }
         tabStrip = (
             <div className={tabStripClasses} style={tabStripStyle} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
-                <div className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
+                <div ref={tabbarInnerRef} className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
                     <div
                         style={{ left: position }}
                         className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER_ + node.getTabLocation())}

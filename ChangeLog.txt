@@ -1,3 +1,30 @@
+0.5.7
+Added typescript typings for the model json
+Fixed drag rectangle showing as dot before first position found (when dragging into the layout)
+Fix for #191 - Global Attributes for classNames not working
+Fix for #212 - TypeScript issue with ILayoutState
+
+0.5.6
+Added external drag drop into layout, see new onExternalDrag prop
+Updated demo to accept dragged links, html and text.
+Tab scrolling direction changed to match VSCode
+Improved positioning of single tab when overflow menu shown
+Some small changes to theme colors
+
+0.5.5
+Fix for #170 - Closing the last tab of a maximized tabset crashes the layout
+
+0.5.4
+Fix issue running with React 17.0.1
+Window title now updates when tab renamed
+
+0.5.3
+Change classname strings to enum values
+TSLint replaced with ESLint
+Added Create-React-App (CRA) example
+New 'light' theme (lighter and without box shadows, gradients), 
+    existing light theme renamed to 'gray'
+
 0.5.2
 Fixed issues caused by double touch/mouse events in IOS
 Prevented IOS scroll during drag in demo app.

@@ -4,13 +4,13 @@ import DockLocation from "../DockLocation";
 import DropInfo from "../DropInfo";
 import Orientation from "../Orientation";
 import Rect from "../Rect";
-import { JSMap } from "../Types";
 import Action from "./Action";
 import Actions from "./Actions";
 import BorderNode from "./BorderNode";
 import BorderSet from "./BorderSet";
 import IDraggable from "./IDraggable";
 import IDropTarget from "./IDropTarget";
+import { IJsonModel } from "./IJsonModel";
 import Node from "./Node";
 import RowNode from "./RowNode";
 import TabNode from "./TabNode";
@@ -32,7 +32,7 @@ class Model {
      * @param json the json model to load
      * @returns {Model} a new Model object
      */
-    static fromJson(json: any) {
+    static fromJson(json: IJsonModel) {
         const model = new Model();
         Model._attributeDefinitions.fromJson(json.global, model._attributes);
 
@@ -50,13 +50,14 @@ class Model {
     private static _createAttributeDefinitions(): AttributeDefinitions {
         const attributeDefinitions = new AttributeDefinitions();
         // splitter
-        attributeDefinitions.add("splitterSize", -1).setType(Attribute.INT);
+        attributeDefinitions.add("splitterSize", -1).setType(Attribute.NUMBER);
         attributeDefinitions.add("enableEdgeDock", true).setType(Attribute.BOOLEAN);
-        attributeDefinitions.add("marginInsets", { top: 0, right: 0, bottom: 0, left: 0 }).setType(Attribute.JSON);
+        attributeDefinitions.add("marginInsets", { top: 0, right: 0, bottom: 0, left: 0 })
+            .setType("IInsets");
 
         // tab
         attributeDefinitions.add("tabEnableClose", true).setType(Attribute.BOOLEAN);
-        attributeDefinitions.add("tabCloseType", 1).setType(Attribute.INT);
+        attributeDefinitions.add("tabCloseType", 1).setType("ICloseType");
         attributeDefinitions.add("tabEnableFloat", false).setType(Attribute.BOOLEAN);
         attributeDefinitions.add("tabEnableDrag", true).setType(Attribute.BOOLEAN);
         attributeDefinitions.add("tabEnableRename", true).setType(Attribute.BOOLEAN);
@@ -75,18 +76,20 @@ class Model {
         attributeDefinitions.add("tabSetClassNameTabStrip", undefined).setType(Attribute.STRING);
         attributeDefinitions.add("tabSetClassNameHeader", undefined).setType(Attribute.STRING);
         attributeDefinitions.add("tabSetEnableTabStrip", true).setType(Attribute.BOOLEAN);
-        attributeDefinitions.add("tabSetHeaderHeight", 0).setType(Attribute.INT).setFrom(0);
-        attributeDefinitions.add("tabSetTabStripHeight", 0).setType(Attribute.INT).setFrom(0);
-        attributeDefinitions.add("tabSetMarginInsets", { top: 0, right: 0, bottom: 0, left: 0 }).setType(Attribute.JSON);
-        attributeDefinitions.add("tabSetBorderInsets", { top: 0, right: 0, bottom: 0, left: 0 }).setType(Attribute.JSON);
-        attributeDefinitions.add("tabSetTabLocation", "top").setType(Attribute.STRING);
+        attributeDefinitions.add("tabSetHeaderHeight", 0).setType(Attribute.NUMBER);
+        attributeDefinitions.add("tabSetTabStripHeight", 0).setType(Attribute.NUMBER);
+        attributeDefinitions.add("tabSetMarginInsets", { top: 0, right: 0, bottom: 0, left: 0 })
+            .setType("IInsets");
+        attributeDefinitions.add("tabSetBorderInsets", { top: 0, right: 0, bottom: 0, left: 0 })
+            .setType("IInsets");
+        attributeDefinitions.add("tabSetTabLocation", "top").setType("ITabLocation");
         attributeDefinitions.add("tabSetMinWidth", 0).setType(Attribute.NUMBER);
         attributeDefinitions.add("tabSetMinHeight", 0).setType(Attribute.NUMBER);
 
         // border
-        attributeDefinitions.add("borderSize", 200).setType(Attribute.INT).setFrom(0);
-        attributeDefinitions.add("borderMinSize", 0).setType(Attribute.INT).setFrom(0);
-        attributeDefinitions.add("borderBarSize", 0).setType(Attribute.INT).setFrom(0);
+        attributeDefinitions.add("borderSize", 200).setType(Attribute.NUMBER);
+        attributeDefinitions.add("borderMinSize", 0).setType(Attribute.NUMBER);
+        attributeDefinitions.add("borderBarSize", 0).setType(Attribute.NUMBER);
         attributeDefinitions.add("borderEnableDrop", true).setType(Attribute.BOOLEAN);
         attributeDefinitions.add("borderAutoSelectTabWhenOpen", true).setType(Attribute.BOOLEAN);
         attributeDefinitions.add("borderAutoSelectTabWhenClosed", false).setType(Attribute.BOOLEAN);
@@ -95,9 +98,9 @@ class Model {
     }
 
     /** @hidden @internal */
-    private _attributes: JSMap<any>;
+    private _attributes: Record<string, any>;
     /** @hidden @internal */
-    private _idMap: JSMap<Node>;
+    private _idMap: Record<string, Node>;
     /** @hidden @internal */
     private _nextId: number;
     /** @hidden @internal */
@@ -159,7 +162,7 @@ class Model {
     }
 
     /** @hidden @internal */
-    _setMaximizedTabset(tabsetNode: TabSetNode) {
+    _setMaximizedTabset(tabsetNode: (TabSetNode | undefined)) {
         this._maximizedTabSet = tabsetNode;
     }
 
@@ -215,8 +218,10 @@ class Model {
      * Update the node tree by performing the given action,
      * Actions should be generated via static methods on the Actions class
      * @param action the action to perform
+     * @returns added Node for Actions.addNode; undefined otherwise
      */
-    doAction(action: Action) {
+    doAction(action: Action): Node | undefined {
+        let returnVal = undefined;
         // console.log(action);
         switch (action.type) {
             case Actions.ADD_NODE: {
@@ -224,6 +229,7 @@ class Model {
                 const toNode = this._idMap[action.data.toNode] as Node & IDraggable;
                 if (toNode instanceof TabSetNode || toNode instanceof BorderNode || toNode instanceof RowNode) {
                     toNode.drop(newNode, DockLocation.getByName(action.data.location), action.data.index, action.data.select);
+                    returnVal = newNode;
                 }
                 break;
             }
@@ -343,6 +349,8 @@ class Model {
         if (this._changeListener !== undefined) {
             this._changeListener();
         }
+
+        return returnVal;
     }
 
     /** @hidden @internal */
@@ -365,9 +373,9 @@ class Model {
 
     /**
      * Converts the model to a json object
-     * @returns {*} json object that represents this model
+     * @returns {IJsonModel} json object that represents this model
      */
-    toJson() {
+    toJson(): IJsonModel {
         const json: any = { global: {}, layout: {} };
         Model._attributeDefinitions.toJson(json.global, this._attributes);
 
@@ -378,7 +386,7 @@ class Model {
 
         json.borders = this._borders._toJson();
         json.layout = (this._root as RowNode)._toJson();
-        return json;
+        return json as IJsonModel;
     }
 
     getSplitterSize() {
@@ -467,9 +475,20 @@ class Model {
         return this._onAllowDrop;
     }
 
+    static toTypescriptInterfaces() {
+        console.log(Model._attributeDefinitions.toTypescriptInterface("Global", undefined));
+        console.log(RowNode.getAttributeDefinitions().toTypescriptInterface("Row", Model._attributeDefinitions));
+        console.log(TabSetNode.getAttributeDefinitions().toTypescriptInterface("TabSet", Model._attributeDefinitions));
+        console.log(TabNode.getAttributeDefinitions().toTypescriptInterface("Tab", Model._attributeDefinitions));
+        console.log(BorderNode.getAttributeDefinitions().toTypescriptInterface("Border", Model._attributeDefinitions));
+    }
+
     toString() {
         return JSON.stringify(this.toJson());
     }
 }
+
+// use to generate json typescript interfaces 
+// Model.toTypescriptInterfaces();
 
 export default Model;

@@ -1,3 +1,4 @@
+import Attribute from "../Attribute";
 import AttributeDefinitions from "../AttributeDefinitions";
 import DockLocation from "../DockLocation";
 import DropInfo from "../DropInfo";
@@ -38,12 +39,12 @@ class RowNode extends Node implements IDropTarget {
     /** @hidden @internal */
     private static _createAttributeDefinitions(): AttributeDefinitions {
         const attributeDefinitions = new AttributeDefinitions();
-        attributeDefinitions.add("type", RowNode.TYPE, true);
-        attributeDefinitions.add("id", undefined);
+        attributeDefinitions.add("type", RowNode.TYPE, true).setType(Attribute.STRING).setFixed();
+        attributeDefinitions.add("id", undefined).setType(Attribute.STRING);
 
-        attributeDefinitions.add("weight", 100);
-        attributeDefinitions.add("width", undefined);
-        attributeDefinitions.add("height", undefined);
+        attributeDefinitions.add("weight", 100).setType(Attribute.NUMBER);
+        attributeDefinitions.add("width", undefined).setType(Attribute.NUMBER);
+        attributeDefinitions.add("height", undefined).setType(Attribute.NUMBER);
 
         return attributeDefinitions;
     }
@@ -69,11 +70,11 @@ class RowNode extends Node implements IDropTarget {
     }
 
     getWidth() {
-        return this._getAttributeAsNumberOrUndefined("width");
+        return this._getAttr("width") as number | undefined;
     }
 
     getHeight() {
-        return this._getAttributeAsNumberOrUndefined("height");
+        return this._getAttr("height") as number | undefined;
     }
 
     /** @hidden @internal */
@@ -329,7 +330,6 @@ class RowNode extends Node implements IDropTarget {
 
     /** @hidden @internal */
     _tidy() {
-        // console.log("a", this._model.toString());
         let i = 0;
         while (i < this._children.length) {
             const child = this._children[i];
@@ -365,6 +365,9 @@ class RowNode extends Node implements IDropTarget {
             } else if (child instanceof TabSetNode && child.getChildren().length === 0) {
                 if (child.isEnableDeleteWhenEmpty()) {
                     this._removeChild(child);
+                    if ( child === this._model.getMaximizedTabset()) {
+                        this._model._setMaximizedTabset(undefined);
+                    }
                 } else {
                     i++;
                 }
@@ -380,7 +383,6 @@ class RowNode extends Node implements IDropTarget {
             this._addChild(child);
         }
 
-        // console.log("b", this._model.toString());
     }
 
     /** @hidden @internal */
@@ -534,6 +536,12 @@ class RowNode extends Node implements IDropTarget {
     _updateAttrs(json: any) {
         RowNode._attributeDefinitions.update(json, this._attributes);
     }
+
+    /** @hidden @internal */
+    static getAttributeDefinitions() {
+        return RowNode._attributeDefinitions;
+    }
+
 }
 
 export default RowNode;

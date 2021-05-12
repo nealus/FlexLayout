@@ -1,7 +1,6 @@
 import Attribute from "../Attribute";
 import AttributeDefinitions from "../AttributeDefinitions";
 import Rect from "../Rect";
-import { JSMap } from "../Types";
 import BorderNode from "./BorderNode";
 import IDraggable from "./IDraggable";
 import Model, { ILayoutMetrics } from "./Model";
@@ -22,16 +21,16 @@ class TabNode extends Node implements IDraggable {
     /** @hidden @internal */
     private static _createAttributeDefinitions(): AttributeDefinitions {
         const attributeDefinitions = new AttributeDefinitions();
-        attributeDefinitions.add("type", TabNode.TYPE, true);
-        attributeDefinitions.add("id", undefined).setType(Attribute.ID);
+        attributeDefinitions.add("type", TabNode.TYPE, true).setType(Attribute.STRING);
+        attributeDefinitions.add("id", undefined).setType(Attribute.STRING);
 
         attributeDefinitions.add("name", "[Unnamed Tab]").setType(Attribute.STRING);
         attributeDefinitions.add("component", undefined).setType(Attribute.STRING);
-        attributeDefinitions.add("config", undefined).setType(Attribute.JSON);
+        attributeDefinitions.add("config", undefined).setType("any");
         attributeDefinitions.add("floating", false).setType(Attribute.BOOLEAN);
 
         attributeDefinitions.addInherited("enableClose", "tabEnableClose").setType(Attribute.BOOLEAN);
-        attributeDefinitions.addInherited("closeType", "tabCloseType").setType(Attribute.INT);
+        attributeDefinitions.addInherited("closeType", "tabCloseType").setType("ICloseType");
         attributeDefinitions.addInherited("enableDrag", "tabEnableDrag").setType(Attribute.BOOLEAN);
         attributeDefinitions.addInherited("enableRename", "tabEnableRename").setType(Attribute.BOOLEAN);
         attributeDefinitions.addInherited("className", "tabClassName").setType(Attribute.STRING);
@@ -46,7 +45,7 @@ class TabNode extends Node implements IDraggable {
     /** @hidden @internal */
     private _renderedName?: string;
     /** @hidden @internal */
-    private _extra: JSMap<any>;
+    private _extra: Record<string, any>;
     /** @hidden @internal */
     private _window?: Window;
 
@@ -90,7 +89,7 @@ class TabNode extends Node implements IDraggable {
     }
 
     getComponent() {
-        return this._getAttributeAsStringOrUndefined("component");
+        return this._getAttr("component") as string | undefined;
     }
 
     /**
@@ -113,12 +112,11 @@ class TabNode extends Node implements IDraggable {
     }
 
     isFloating() {
-        const configFloating = this._getAttr("floating") as boolean;
-        return configFloating;
+        return this._getAttr("floating") as boolean;
     }
 
     getIcon() {
-        return this._getAttributeAsStringOrUndefined("icon");
+        return this._getAttr("icon") as string | undefined;
     }
 
     isEnableClose() {
@@ -130,8 +128,7 @@ class TabNode extends Node implements IDraggable {
     }
 
     isEnableFloat() {
-        const allowFloat = this._getAttr("enableFloat") as boolean;
-        return allowFloat;
+        return this._getAttr("enableFloat") as boolean;
     }
 
     isEnableDrag() {
@@ -143,7 +140,7 @@ class TabNode extends Node implements IDraggable {
     }
 
     getClassName() {
-        return this._getAttributeAsStringOrUndefined("className");
+        return this._getAttr("className") as string | undefined;
     }
 
     isEnableRenderOnDemand() {
@@ -153,6 +150,9 @@ class TabNode extends Node implements IDraggable {
     /** @hidden @internal */
     _setName(name: string) {
         this._attributes.name = name;
+        if (this._window && this._window.document) {
+            this._window.document.title = name;
+        }
     }
 
     /** @hidden @internal */
@@ -195,6 +195,13 @@ class TabNode extends Node implements IDraggable {
     _setWindow(window: Window | undefined) {
         this._window = window;
     }
+
+
+    /** @hidden @internal */
+    static getAttributeDefinitions() {
+        return TabNode._attributeDefinitions;
+    }
+
 }
 
 export default TabNode;

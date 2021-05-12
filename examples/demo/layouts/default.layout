@@ -30,6 +30,15 @@
 						"type": "tab",
 						"name": "Three",
 						"component": "grid"
+					},
+					{
+						"type": "tab",
+						"name": "Wikipedia",
+						"component": "multitype",
+						"config": {
+                            "type":"url",
+							"data": "https://en.wikipedia.org/wiki/Main_Page"
+						}
 					}
 				]
 			}

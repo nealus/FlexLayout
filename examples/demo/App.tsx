@@ -2,18 +2,18 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as FlexLayout from "../../src/index";
 import Utils from "./Utils";
-import { Node, TabSetNode, TabNode, DropInfo, BorderNode, Actions, Action } from "../../src/index";
+import { Node, TabSetNode, TabNode, DropInfo, BorderNode, Action } from "../../src/index";
 
 var fields = ["Name", "Field1", "Field2", "Field3", "Field4", "Field5"];
 
-class App extends React.Component<any, { layoutFile: string | null, model: FlexLayout.Model | null, adding: boolean, maximized: boolean, fontSize: string }> {
+class App extends React.Component<any, { layoutFile: string | null, model: FlexLayout.Model | null, adding: boolean, fontSize: string }> {
 
     loadingLayoutName?: string;
     nextGridIndex: number = 1;
 
     constructor(props: any) {
         super(props);
-        this.state = { layoutFile: null, model: null, adding: false, maximized: false, fontSize: "medium" };
+        this.state = { layoutFile: null, model: null, adding: false, fontSize: "medium" };
 
         // save layout when unloading page
         window.onbeforeunload = (event: Event) => {
@@ -29,7 +29,7 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
 
     componentDidMount() {
         this.loadLayout("default", false);
-        document.body.addEventListener('touchmove', this.preventIOSScrollingWhenDragging, { passive: false });
+        document.body.addEventListener("touchmove", this.preventIOSScrollingWhenDragging, { passive: false });
     }
 
     save() {
@@ -117,6 +117,43 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
         }
     }
 
+    onExternalDrag = (e: React.DragEvent) => {
+        // console.log("onExternaldrag ", e.dataTransfer.types);
+        // Check for supported content type
+        const validTypes = ["text/uri-list", "text/html", "text/plain"];
+        if (e.dataTransfer.types.find(t => validTypes.indexOf(t) !== -1) === undefined) return;
+        // Set dropEffect (icon)
+        e.dataTransfer.dropEffect = "link";
+        return {
+            dragText: "Drag To New Tab",
+            json: {
+                type: "tab",
+                component: "multitype"
+            },
+            onDrop: (node?: Node, event?: Event) => {
+                if (!node || !event) return;  // aborted drag
+
+                if (node instanceof TabNode && event instanceof DragEvent) {
+                    const dragEvent = event as DragEvent;
+                    if (dragEvent.dataTransfer) {
+                        if (dragEvent.dataTransfer.types.indexOf("text/uri-list") !== -1) {
+                            const data = dragEvent.dataTransfer!.getData("text/uri-list");
+                            this.state.model!.doAction(FlexLayout.Actions.updateNodeAttributes(node.getId(), { name: "Url", config: { data, type: "url" } }));
+                        }
+                        else if (dragEvent.dataTransfer.types.indexOf("text/html") !== -1) {
+                            const data = dragEvent.dataTransfer!.getData("text/html");
+                            this.state.model!.doAction(FlexLayout.Actions.updateNodeAttributes(node.getId(), { name: "Html", config: { data, type: "html" } }));
+                        }
+                        else if (dragEvent.dataTransfer.types.indexOf("text/plain") !== -1) {
+                            const data = dragEvent.dataTransfer!.getData("text/plain");
+                            this.state.model!.doAction(FlexLayout.Actions.updateNodeAttributes(node.getId(), { name: "Text", config: { data, type: "text" } }));
+                        }
+                    }
+                }
+            }
+        }
+    };
+
     onShowLayoutClick = (event: React.MouseEvent) => {
         console.log(JSON.stringify(this.state.model!.toJson(), null, "\t"));
     }
@@ -131,9 +168,6 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
     }
 
     onAction = (action: Action) => {
-        if (action.type === Actions.MAXIMIZE_TOGGLE) {
-            this.setState({ maximized: this.state.model!.getMaximizedTabset() === undefined })
-        }
         return action;
     }
 
@@ -169,21 +203,42 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
             return <FlexLayout.Layout model={model} factory={this.factory} />;
         }
         else if (component === "text") {
-            return <div dangerouslySetInnerHTML={{ __html: node.getConfig().text }} />;
+            try {
+                return <div dangerouslySetInnerHTML={{ __html: node.getConfig().text }} />;
+            } catch (e) {
+                console.log(e);
+            }
+        }
+        else if (component === "multitype") {
+            try {
+                const config = node.getConfig();
+                if (config.type === "url") {
+                    return <iframe title={node.getId()} src={config.data} style={{ display: "block", boxSizing: "border-box" }} width="100%" height="100%" />;
+                } else if (config.type === "html") {
+                    return (<div dangerouslySetInnerHTML={{ __html: config.data }} />);
+                } else if (config.type === "text") {
+                    return (
+                        <textarea style={{ position: "absolute", width: "100%", height: "100%", resize: "none", boxSizing: "border-box", border: "none" }}
+                            defaultValue={config.data}
+                        />);
+                }
+            } catch (e) {
+                return (<div>{String(e)}</div>);
+            }
         }
 
         return null;
     }
 
     titleFactory = (node: TabNode) => {
-        if (node.getId() === 'custom-tab') {
+        if (node.getId() === "custom-tab") {
             return <>(Added by titleFactory) {node.getName()}</>
         }
         return;
     }
 
     iconFactory = (node: TabNode) => {
-        if (node.getId() === 'custom-tab') {
+        if (node.getId() === "custom-tab") {
             return <><span style={{ marginRight: 3 }}>:)</span></>
         }
         return;
@@ -227,7 +282,9 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
         };
 
         let contents: React.ReactNode = "loading ...";
+        let maximized = false;
         if (this.state.model !== null) {
+            maximized = this.state.model.getMaximizedTabset() !== undefined;
             contents = <FlexLayout.Layout
                 ref="layout"
                 model={this.state.model}
@@ -238,6 +295,7 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
                 iconFactory={this.iconFactory}
                 onRenderTab={onRenderTab}
                 onRenderTabSet={onRenderTabSet}
+                onExternalDrag={this.onExternalDrag}
             // classNameMapper={
             //     className => {
             //         console.log(className);
@@ -303,16 +361,17 @@ class App extends React.Component<any, { layoutFile: string | null, model: FlexL
                 </select>
                 <select style={{ marginLeft: 5 }} onChange={this.onThemeChange}>
                     <option value="light">Light</option>
+                    <option value="gray" selected>Gray</option>
                     <option value="dark">Dark</option>
                 </select>
                 <button style={{ marginLeft: 5 }} onClick={this.onShowLayoutClick}>Show Layout JSON in Console</button>
-                <button disabled={this.state.adding || this.state.maximized}
+                <button disabled={this.state.adding || maximized}
                     style={{ height: "30px", marginLeft: 5, border: "none", outline: "none", backgroundColor: "lightgray" }}
                     title="Add using Layout.addTabWithDragAndDrop"
                     onMouseDown={this.onAddDragMouseDown}
                     onTouchStart={this.onAddDragMouseDown}>Add Drag</button>
-                <button disabled={this.state.adding || this.state.maximized} style={{ marginLeft: 5 }} title="Add using Layout.addTabToActiveTabSet" onClick={this.onAddActiveClick}>Add Active</button>
-                <button disabled={this.state.adding || this.state.maximized} style={{ marginLeft: 5 }} title="Add using Layout.addTabWithDragAndDropIndirect" onClick={this.onAddIndirectClick}>Add Indirect</button>
+                <button disabled={this.state.adding || maximized} style={{ marginLeft: 5 }} title="Add using Layout.addTabToActiveTabSet" onClick={this.onAddActiveClick}>Add Active</button>
+                <button disabled={this.state.adding || maximized} style={{ marginLeft: 5 }} title="Add using Layout.addTabWithDragAndDropIndirect" onClick={this.onAddIndirectClick}>Add Indirect</button>
             </div>
             <div className="contents">
                 {contents}

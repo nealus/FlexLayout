@@ -1,3 +1,4 @@
+import * as React from "react";
 import Rect from "./Rect";
 
 /** @hidden @internal */
@@ -34,6 +35,8 @@ class DragDrop {
     /** @hidden @internal */
     private _startY: number = 0;
     /** @hidden @internal */
+    private _dragDepth: number = 0;
+    /** @hidden @internal */
     private _glassShowing: boolean = false;
     /** @hidden @internal */
     private _dragging: boolean = false;
@@ -42,7 +45,9 @@ class DragDrop {
     /** @hidden @internal */
     private _document?: HTMLDocument;
     /** @hidden @internal */
-    private _lastEvent?: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | undefined;
+    private _rootElement?: HTMLElement | undefined;
+    /** @hidden @internal */
+    private _lastEvent?: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | React.DragEvent<Element> | undefined;
 
     /** @hidden @internal */
     private constructor() {
@@ -50,7 +55,6 @@ class DragDrop {
             // check for serverside rendering
             this._glass = document.createElement("div");
             this._glass.style.zIndex = "998";
-            this._glass.style.position = "absolute";
             this._glass.style.backgroundColor = "transparent";
             this._glass.style.outline = "none";
         }
@@ -58,6 +62,10 @@ class DragDrop {
         this._onMouseMove = this._onMouseMove.bind(this);
         this._onMouseUp = this._onMouseUp.bind(this);
         this._onKeyPress = this._onKeyPress.bind(this);
+        this._onDragCancel = this._onDragCancel.bind(this);
+        this._onDragEnter = this._onDragEnter.bind(this);
+        this._onDragLeave = this._onDragLeave.bind(this);
+        this.resizeGlass = this.resizeGlass.bind(this);
 
         this._lastClick = 0;
         this._clickX = 0;
@@ -65,18 +73,23 @@ class DragDrop {
     }
 
     // if you add the glass pane then you should remove it
-    addGlass(fCancel: ((wasDragging: boolean) => void) | undefined, currentDocument?: HTMLDocument) {
+    addGlass(fCancel: ((wasDragging: boolean) => void) | undefined) {
         if (!this._glassShowing) {
-            if (!currentDocument) {
-                currentDocument = window.document;
+            if (!this._document) {
+                this._document = window.document;
             }
-            this._document = currentDocument;
-            const glassRect = new Rect(0, 0, currentDocument!.documentElement.scrollWidth, currentDocument!.documentElement.scrollHeight);
-            glassRect.positionElement(this._glass!);
-            currentDocument!.body.appendChild(this._glass!);
+            if (!this._rootElement) {
+                this._rootElement = this._document.body;
+            }
+            this.resizeGlass();
+            this._document.defaultView?.addEventListener('resize', this.resizeGlass);
+            this._document.body.appendChild(this._glass!);
             this._glass!.tabIndex = -1;
             this._glass!.focus();
             this._glass!.addEventListener("keydown", this._onKeyPress);
+            this._glass!.addEventListener("dragenter", this._onDragEnter, { passive: false });
+            this._glass!.addEventListener("dragover", this._onMouseMove, { passive: false });
+            this._glass!.addEventListener("dragleave", this._onDragLeave, { passive: false });
             this._glassShowing = true;
             this._fDragCancel = fCancel;
             this._manualGlassManagement = false;
@@ -86,23 +99,31 @@ class DragDrop {
         }
     }
 
+    resizeGlass() {
+        const glassRect = Rect.fromElement(this._rootElement!);
+        glassRect.positionElement(this._glass!, "fixed");
+    }
+
     hideGlass() {
         if (this._glassShowing) {
             this._document!.body.removeChild(this._glass!);
+            this._document!.defaultView?.removeEventListener('resize', this.resizeGlass);
             this._glassShowing = false;
             this._document = undefined;
+            this._rootElement = undefined;
         }
     }
 
     startDrag(
-        event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | undefined,
+        event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | React.DragEvent<Element> | undefined,
         fDragStart: ((pos: { clientX: number; clientY: number }) => boolean) | undefined,
         fDragMove: ((event: React.MouseEvent<Element>) => void) | undefined,
         fDragEnd: ((event: Event) => void) | undefined,
         fDragCancel?: ((wasDragging: boolean) => void) | undefined,
         fClick?: ((event: Event) => void) | undefined,
         fDblClick?: ((event: Event) => void) | undefined,
-        currentDocument?: Document
+        currentDocument?: Document,
+        rootElement?: HTMLDivElement
     ) {
         // prevent 'duplicate' action (mouse event for same action as previous touch event (a fix for ios))
         if (event && this._lastEvent && this._lastEvent.type.startsWith("touch") && event.type.startsWith("mouse") && event.timeStamp - this._lastEvent.timeStamp < 500) {
@@ -116,9 +137,14 @@ class DragDrop {
         } else {
             this._document = window.document;
         }
+        if (rootElement) {
+            this._rootElement = rootElement;
+        } else {
+            this._rootElement = this._document.body;
+        }
 
         const posEvent = this._getLocationEvent(event);
-        this.addGlass(fDragCancel, currentDocument);
+        this.addGlass(fDragCancel);
 
         if (this._dragging) {
             console.warn("this._dragging true on startDrag should never happen");
@@ -148,10 +174,19 @@ class DragDrop {
 
         this._active = true;
 
-        this._document.addEventListener("mouseup", this._onMouseUp, { passive: false });
-        this._document.addEventListener("mousemove", this._onMouseMove, { passive: false });
-        this._document.addEventListener("touchend", this._onMouseUp, { passive: false });
-        this._document.addEventListener("touchmove", this._onMouseMove, { passive: false });
+        if (event?.type === 'dragenter') {
+            this._dragDepth = 1;
+            this._rootElement.addEventListener("dragenter", this._onDragEnter, { passive: false });
+            this._rootElement.addEventListener("dragover", this._onMouseMove, { passive: false });
+            this._rootElement.addEventListener("dragleave", this._onDragLeave, { passive: false });
+            this._document.addEventListener("dragend", this._onDragCancel, { passive: false });
+            this._document.addEventListener("drop", this._onMouseUp, { passive: false });
+        } else {
+            this._document.addEventListener("mouseup", this._onMouseUp, { passive: false });
+            this._document.addEventListener("mousemove", this._onMouseMove, { passive: false });
+            this._document.addEventListener("touchend", this._onMouseUp, { passive: false });
+            this._document.addEventListener("touchmove", this._onMouseMove, { passive: false });
+        }
     }
 
     isDragging() {
@@ -170,17 +205,29 @@ class DragDrop {
 
     /** @hidden @internal */
     private _onKeyPress(event: KeyboardEvent) {
-        if (this._fDragCancel !== undefined && event.keyCode === 27) {
+        if (event.keyCode === 27) {
             // esc
-            this._document!.removeEventListener("mousemove", this._onMouseMove);
-            this._document!.removeEventListener("mouseup", this._onMouseUp);
-            this._document!.removeEventListener("touchend", this._onMouseUp);
-            this._document!.removeEventListener("touchmove", this._onMouseMove);
-            this.hideGlass();
-            this._fDragCancel(this._dragging);
-            this._dragging = false;
-            this._active = false;
+            this._onDragCancel();
         }
+    }
+
+    /** @hidden @internal */
+    private _onDragCancel() {
+        this._rootElement!.removeEventListener("dragenter", this._onDragEnter);
+        this._rootElement!.removeEventListener("dragover", this._onMouseMove);
+        this._rootElement!.removeEventListener("dragleave", this._onDragLeave);
+        this._document!.removeEventListener("dragend", this._onDragCancel);
+        this._document!.removeEventListener("drop", this._onMouseUp);
+        this._document!.removeEventListener("mousemove", this._onMouseMove);
+        this._document!.removeEventListener("mouseup", this._onMouseUp);
+        this._document!.removeEventListener("touchend", this._onMouseUp);
+        this._document!.removeEventListener("touchmove", this._onMouseMove);
+        this.hideGlass();
+        if (this._fDragCancel !== undefined) {
+            this._fDragCancel(this._dragging);
+        }
+        this._dragging = false;
+        this._active = false;
     }
 
     /** @hidden @internal */
@@ -202,14 +249,14 @@ class DragDrop {
     }
 
     /** @hidden @internal */
-    private _stopPropagation(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement>) {
+    private _stopPropagation(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | React.DragEvent<Element>) {
         if (event.stopPropagation) {
             event.stopPropagation();
         }
     }
 
     /** @hidden @internal */
-    private _preventDefault(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement>) {
+    private _preventDefault(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | React.DragEvent<Element>) {
         if (event.preventDefault && event.cancelable) {
             event.preventDefault();
         }
@@ -217,7 +264,7 @@ class DragDrop {
     }
 
     /** @hidden @internal */
-    private _onMouseMove(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement>) {
+    private _onMouseMove(event: Event | React.MouseEvent<HTMLDivElement, MouseEvent> | React.TouchEvent<HTMLDivElement> | React.DragEvent<Element>) {
         this._lastEvent = event;
 
         const posEvent = this._getLocationEvent(event);
@@ -251,6 +298,11 @@ class DragDrop {
 
         this._active = false;
 
+        this._rootElement!.removeEventListener("dragenter", this._onDragEnter);
+        this._rootElement!.removeEventListener("dragover", this._onMouseMove);
+        this._rootElement!.removeEventListener("dragleave", this._onDragLeave);
+        this._document!.removeEventListener("dragend", this._onDragCancel);
+        this._document!.removeEventListener("drop", this._onMouseUp);
         this._document!.removeEventListener("mousemove", this._onMouseMove);
         this._document!.removeEventListener("mouseup", this._onMouseUp);
         this._document!.removeEventListener("touchend", this._onMouseUp);
@@ -288,6 +340,25 @@ class DragDrop {
                 this._clickX = posEvent.clientX;
                 this._clickY = posEvent.clientY;
             }
+        }
+        return false;
+    }
+
+    /** @hidden @internal */
+    private _onDragEnter(event: DragEvent) {
+        this._preventDefault(event);
+        this._stopPropagation(event);
+        this._dragDepth++;
+        return false;
+    }
+
+    /** @hidden @internal */
+    private _onDragLeave(event: DragEvent) {
+        this._preventDefault(event);
+        this._stopPropagation(event);
+        this._dragDepth--;
+        if (this._dragDepth <= 0) {
+            this._onDragCancel();
         }
         return false;
     }

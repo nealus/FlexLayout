@@ -25,10 +25,11 @@ export const useTabOverflow = (node: TabSetNode | BorderNode, orientation: Orien
     });
 
     React.useEffect(() => {
-        selfRef.current!.addEventListener("wheel", onWheel);
+        const instance = selfRef.current!;
+        instance .addEventListener('wheel', onWheel);
         return () => {
-            selfRef.current!.removeEventListener("wheel", onWheel);
-        };
+            instance.removeEventListener('wheel', onWheel);
+        }
     }, []);
 
     // needed to prevent default mouse wheel over tabset/border (cannot do with react event?)
@@ -52,7 +53,7 @@ export const useTabOverflow = (node: TabSetNode | BorderNode, orientation: Orien
         }
     };
 
-    const getSize = (rect: DOMRect) => {
+    const getSize = (rect: DOMRect | Rect) => {
         if (orientation === Orientation.HORZ) {
             return rect.width;
         } else {
@@ -87,13 +88,19 @@ export const useTabOverflow = (node: TabSetNode | BorderNode, orientation: Orien
                     const selectedRect = selectedTab.getTabRect()!;
                     const selectedStart = getNear(selectedRect) - tabMargin;
                     const selectedEnd = getFar(selectedRect) + tabMargin;
-                    if (selectedEnd > endPos || selectedStart < getNear(nodeRect)) {
-                        if (selectedStart < getNear(nodeRect)) {
-                            shiftPos = getNear(nodeRect) - selectedStart;
-                        }
-                        // use second if statement to prevent tab moving back then forwards if not enough space for single tab
-                        if (selectedEnd + shiftPos > endPos) {
-                            shiftPos = endPos - selectedEnd;
+
+                    // when selected tab is larger than available space then align left
+                    if (getSize(selectedRect) + 2 * tabMargin >= endPos - getNear(nodeRect) ) {
+                        shiftPos = getNear(nodeRect) - selectedStart;
+                    } else {
+                        if (selectedEnd > endPos || selectedStart < getNear(nodeRect)) {
+                            if (selectedStart < getNear(nodeRect)) {
+                                shiftPos = getNear(nodeRect) - selectedStart;
+                            }
+                            // use second if statement to prevent tab moving back then forwards if not enough space for single tab
+                            if (selectedEnd + shiftPos > endPos) {
+                                shiftPos = endPos - selectedEnd;
+                            }
                         }
                     }
                 }
@@ -123,9 +130,9 @@ export const useTabOverflow = (node: TabSetNode | BorderNode, orientation: Orien
     const onMouseWheel = (event: React.WheelEvent<HTMLDivElement>) => {
         let delta = 0;
         if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-            delta = event.deltaX;
+            delta = -event.deltaX;
         } else {
-            delta = event.deltaY;
+            delta = -event.deltaY;
         }
         if (event.deltaMode === 1) {
             // DOM_DELTA_LINE	0x01	The delta values are specified in lines.
