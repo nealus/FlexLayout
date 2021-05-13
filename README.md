@@ -173,6 +173,10 @@ The above code would render two tabsets horizontally each containing a single ta
 
 Try it now using [JSFiddle](https://jsfiddle.net/9x6hecdw/) 
 
+A simple Create React App (CRA) example (using typescript) can be found here:
+
+https://github.com/nealus/FlexLayout_cra_example
+
 
 The model is built up using 4 types of 'node':
 
@@ -540,9 +544,30 @@ Example:
 | save |      | called before a tabnode is serialized to json, use to save node config by adding data to the object returned by node.getConfig()|
 
 
-## Building the Project
+## Running the Examples and Building the Project
 
-To compile the project just run webpack in the top level directory, this will compile and bundle flexlayout and the examples into
-the bundles dir. Once compiled the examples can be run by opening their index.html files.
+First install dependencies:
 
-To build the npm distribution run 'npm run build', this will create the artifacts in the dist dir.
+```
+yarn install
+```
+
+Install the peer dependencies:
+
+```
+yarn add react
+yarn add react-dom
+```
+
+Compile the project and run the examples:
+ 
+```
+yarn start
+```
+
+Open your browser at http://localhost:8080/examples/ to show the examples directory, click on the examples to run them.
+
+The 'yarn start' command will watch for changes to flexlayout and example source, so you can make changes to the code
+and then refresh the browser to see the result.
+
+To build the npm distribution run 'yarn build', this will create the artifacts in the dist dir.
