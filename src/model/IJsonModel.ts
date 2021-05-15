@@ -66,6 +66,7 @@ interface IGlobalAttributes {
     tabSetMinWidth?: number; // default: 0
     tabSetTabLocation?: ITabLocation; // default: "top"
     tabSetTabStripHeight?: number; // default: 0
+    rootOrientationVertical?: boolean; // default: false
 }
 interface IRowAttributes {
     height?: number;
