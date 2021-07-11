@@ -15,6 +15,8 @@ import Node from "./Node";
 import RowNode from "./RowNode";
 import TabNode from "./TabNode";
 import TabSetNode from "./TabSetNode";
+import {ITabSetAttributes} from "./IJsonModel";
+import { adjustSelectedIndexAfterDock, adjustSelectedIndexAfterFloat } from "./Utils";
 
 /** @hidden @internal */
 export interface ILayoutMetrics {
@@ -120,6 +122,8 @@ class Model {
     private _borderRects: { inner: Rect; outer: Rect } = { inner: Rect.empty(), outer: Rect.empty() };
     /** @hidden @internal */
     private _pointerFine: boolean;
+    /** @hidden @internal */
+    private _onCreateTabSet? : (tabNode?: TabNode) => ITabSetAttributes;
 
     /**
      * 'private' constructor. Use the static method Model.fromJson(json) to create a model
@@ -260,6 +264,7 @@ class Model {
                 const node = this._idMap[action.data.node];
                 if (node instanceof TabNode) {
                     node._setFloating(true);
+                    adjustSelectedIndexAfterFloat(node);
                 }
                 break;
             }
@@ -267,6 +272,7 @@ class Model {
                 const node = this._idMap[action.data.node];
                 if (node instanceof TabNode) {
                     node._setFloating(false);
+                    adjustSelectedIndexAfterDock(node);
                 }
                 break;
             }
@@ -480,6 +486,21 @@ class Model {
         return this._onAllowDrop;
     }
 
+    /**
+     * set callback called when a new TabSet is created.
+     * The tabNode can be undefined if it's the auto created first tabset in the root row (when the last
+     * tab is deleted, the root tabset can be recreated)
+     * @param onCreateTabSet 
+     */
+    setOnCreateTabSet(onCreateTabSet: (tabNode?: TabNode) => ITabSetAttributes) {
+        this._onCreateTabSet = onCreateTabSet;
+    }
+
+    /** @hidden @internal */
+    _getOnCreateTabSet() {
+        return this._onCreateTabSet;
+    }
+
     static toTypescriptInterfaces() {
         console.log(Model._attributeDefinitions.toTypescriptInterface("Global", undefined));
         console.log(RowNode.getAttributeDefinitions().toTypescriptInterface("Row", Model._attributeDefinitions));
@@ -493,7 +514,5 @@ class Model {
     }
 }
 
-// use to generate json typescript interfaces 
-// Model.toTypescriptInterfaces();
 
 export default Model;

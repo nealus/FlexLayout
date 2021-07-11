@@ -17,6 +17,7 @@ export interface ITabSetProps {
     iconFactory?: (node: TabNode) => React.ReactNode | undefined;
     titleFactory?: (node: TabNode) => React.ReactNode | undefined;
     icons?: IIcons;
+    editingTab?: TabNode; 
 }
 
 /** @hidden @internal */
@@ -26,8 +27,9 @@ export const TabSet = (props: ITabSetProps) => {
     const toolbarRef = React.useRef<HTMLDivElement | null>(null);
     const overflowbuttonRef = React.useRef<HTMLButtonElement | null>(null);
     const tabbarInnerRef = React.useRef<HTMLDivElement | null>(null);
+    const stickyButtonsRef = React.useRef<HTMLDivElement | null>(null);
 
-    const { selfRef, position, userControlledLeft, hiddenTabs, onMouseWheel } = useTabOverflow(node, Orientation.HORZ, toolbarRef);
+    const { selfRef, position, userControlledLeft, hiddenTabs, onMouseWheel, tabsTruncated } = useTabOverflow(node, Orientation.HORZ, toolbarRef, stickyButtonsRef);
 
     const onOverflowClick = () => {
         const element = overflowbuttonRef.current!;
@@ -47,11 +49,13 @@ export const TabSet = (props: ITabSetProps) => {
             name = ": " + name;
         }
         layout.doAction(Actions.setActiveTabset(node.getId()));
-        const message = layout.i18nName(I18nLabel.Move_Tabset, name);
-        layout.dragStart(event, message, node, node.isEnableDrag(), (event2: Event) => undefined, onDoubleClick);
+        if (!layout.getEditingTab()) {
+            const message = layout.i18nName(I18nLabel.Move_Tabset, name);
+            layout.dragStart(event, message, node, node.isEnableDrag(), (event2: Event) => undefined, onDoubleClick);
+        }
     };
 
-    const onInterceptMouseDown = (event: React.MouseEvent<HTMLDivElement, MouseEvent> | React.MouseEvent<HTMLButtonElement, MouseEvent> | React.TouchEvent<HTMLButtonElement>) => {
+    const onInterceptMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
         event.stopPropagation();
     };
 
@@ -109,13 +113,35 @@ export const TabSet = (props: ITabSetProps) => {
         }
     }
 
-    let buttons: any[] = [];
+    const showHeader = node.getName() !== undefined;
+    let stickyButtons: React.ReactNode[] = [];
+    let buttons: React.ReactNode[] = [];
+    let headerButtons: React.ReactNode[] = [];
 
     // allow customization of header contents and buttons
-    const renderState = { headerContent: node.getName(), buttons };
+    const renderState = { headerContent: node.getName(), stickyButtons, buttons, headerButtons };
     layout.customizeTabSet(node, renderState);
     const headerContent = renderState.headerContent;
+    stickyButtons = renderState.stickyButtons;
     buttons = renderState.buttons;
+    headerButtons = renderState.headerButtons;
+
+    if (stickyButtons.length > 0) {
+        if (tabsTruncated) {
+            buttons = [...stickyButtons, ...buttons];
+        } else {
+            tabs.push(<div
+                ref={stickyButtonsRef}
+                key="sticky_buttons_container"
+                onMouseDown={onInterceptMouseDown}
+                onTouchStart={onInterceptMouseDown}
+                onDragStart={(e) => { e.preventDefault() }}
+                className={cm(CLASSES.FLEXLAYOUT__TAB_TOOLBAR_STICKY_BUTTONS_CONTAINER)}
+            >
+                {stickyButtons}
+            </div>);
+        }
+    }
 
     let toolbar;
     if (hiddenTabs.length > 0) {
@@ -154,7 +180,8 @@ export const TabSet = (props: ITabSetProps) => {
     if (node.canMaximize()) {
         const minTitle = layout.i18nName(I18nLabel.Restore);
         const maxTitle = layout.i18nName(I18nLabel.Maximize);
-        buttons.push(
+        const btns = showHeader ? headerButtons : buttons;
+        btns.push(
             <button
                 key="max"
                 title={node.isMaximized() ? minTitle : maxTitle}
@@ -169,12 +196,16 @@ export const TabSet = (props: ITabSetProps) => {
     }
 
     toolbar = (
-        <div key="toolbar" ref={toolbarRef} className={cm(CLASSES.FLEXLAYOUT__TAB_TOOLBAR)} onMouseDown={onInterceptMouseDown}>
+        <div key="toolbar" ref={toolbarRef}
+            className={cm(CLASSES.FLEXLAYOUT__TAB_TOOLBAR)}
+            onMouseDown={onInterceptMouseDown}
+            onTouchStart={onInterceptMouseDown}
+            onDragStart={(e) => { e.preventDefault() }}
+        >
             {buttons}
         </div>
     );
 
-    const showHeader = node.getName() !== undefined;
     let header;
     let tabStrip;
 
@@ -193,6 +224,18 @@ export const TabSet = (props: ITabSetProps) => {
     }
 
     if (showHeader) {
+
+        const headerToolbar = (
+            <div key="toolbar" ref={toolbarRef}
+                className={cm(CLASSES.FLEXLAYOUT__TAB_TOOLBAR)}
+                onMouseDown={onInterceptMouseDown}
+                onTouchStart={onInterceptMouseDown}
+                onDragStart={(e) => { e.preventDefault() }}
+            >
+                {headerButtons}
+            </div>
+        );
+
         let tabHeaderClasses = cm(CLASSES.FLEXLAYOUT__TABSET_HEADER);
         if (node.isActive()) {
             tabHeaderClasses += " " + cm(CLASSES.FLEXLAYOUT__TABSET_SELECTED);
@@ -207,49 +250,32 @@ export const TabSet = (props: ITabSetProps) => {
         header = (
             <div className={tabHeaderClasses} style={{ height: node.getHeaderHeight() + "px" }} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
                 <div className={cm(CLASSES.FLEXLAYOUT__TABSET_HEADER_CONTENT)}>{headerContent}</div>
-                {toolbar}
-            </div>
-        );
-        const tabStripStyle: { [key: string]: string } = { height: node.getTabStripHeight() + "px" };
-        if (node.getTabLocation() === "top") {
-            tabStripStyle["top"] = node.getHeaderHeight() + "px";
-        } else {
-            tabStripStyle["bottom"] = "0px";
-        }
-
-        tabStrip = (
-            <div className={tabStripClasses} style={tabStripStyle} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
-                <div ref={tabbarInnerRef} className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
-                    <div
-                        style={{ left: position }}
-                        className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER_ + node.getTabLocation())}
-                    >
-                        {tabs}
-                    </div>
-                </div>
-            </div>
-        );
-    } else {
-        const tabStripStyle: { [key: string]: string } = { height: node.getTabStripHeight() + "px" };
-        if (node.getTabLocation() === "top") {
-            tabStripStyle["top"] = "0px";
-        } else {
-            tabStripStyle["bottom"] = "0px";
-        }
-        tabStrip = (
-            <div className={tabStripClasses} style={tabStripStyle} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
-                <div ref={tabbarInnerRef} className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
-                    <div
-                        style={{ left: position }}
-                        className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER_ + node.getTabLocation())}
-                    >
-                        {tabs}
-                    </div>
-                </div>
-                {toolbar}
+                {headerToolbar}
             </div>
         );
     }
+
+    const tabStripStyle: { [key: string]: string } = { height: node.getTabStripHeight() + "px" };
+    if (node.getTabLocation() === "top") {
+        const top = showHeader ? node.getHeaderHeight() + "px" : "0px";
+        tabStripStyle["top"] = top;
+    } else {
+        tabStripStyle["bottom"] = "0px";
+    }
+    tabStrip = (
+        <div className={tabStripClasses} style={tabStripStyle} onMouseDown={onMouseDown} onTouchStart={onMouseDown}>
+            <div ref={tabbarInnerRef} className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_ + node.getTabLocation())}>
+                <div
+                    style={{ left: position }}
+                    className={cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER) + " " + cm(CLASSES.FLEXLAYOUT__TABSET_TABBAR_INNER_TAB_CONTAINER_ + node.getTabLocation())}
+                >
+                    {tabs}
+                </div>
+            </div>
+            {toolbar}
+        </div>
+    );
+
     style = layout.styleFont(style);
 
     return (

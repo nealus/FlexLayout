@@ -27,12 +27,7 @@ import { IJsonTabNode } from "../model/IJsonModel";
 export interface ILayoutProps {
     model: Model;
     factory: (node: TabNode) => React.ReactNode;
-    font?: {
-        size?: string;
-        family?: string;
-        style?: string;
-        weight?: string;
-    };
+    font?: IFontValues;
     fontFamily?: string;
     iconFactory?: (node: TabNode) => React.ReactNode | undefined;
     titleFactory?: (node: TabNode) => ITitleObject | React.ReactNode | undefined;
@@ -41,19 +36,11 @@ export interface ILayoutProps {
     onAction?: (action: Action) => Action | undefined;
     onRenderTab?: (
         node: TabNode,
-        renderValues: {
-            leading: React.ReactNode;
-            content: React.ReactNode;
-            name: string;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabRenderValues,
     ) => void;
     onRenderTabSet?: (
         tabSetNode: TabSetNode | BorderNode,
-        renderValues: {
-            headerContent?: React.ReactNode;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabSetRenderValues,
     ) => void;
     onModelChange?: (model: Model) => void;
     onExternalDrag?: (event: React.DragEvent<HTMLDivElement>) => undefined | {
@@ -66,6 +53,26 @@ export interface ILayoutProps {
     supportsPopout?: boolean | undefined;
     popoutURL?: string | undefined;
 }
+export interface IFontValues {
+    size?: string;
+    family?: string;
+    style?: string;
+    weight?: string;
+}
+
+export interface ITabSetRenderValues {
+    headerContent?: React.ReactNode;
+    stickyButtons: React.ReactNode[];
+    buttons: React.ReactNode[];
+    headerButtons: React.ReactNode[];
+}
+
+export interface ITabRenderValues {
+    leading: React.ReactNode;
+    content: React.ReactNode;
+    name: string;
+    buttons: React.ReactNode[];
+}
 
 export interface ITitleObject {
     titleContent: React.ReactNode;
@@ -77,6 +84,7 @@ export interface ILayoutState {
     calculatedHeaderBarSize: number;
     calculatedTabBarSize: number;
     calculatedBorderBarSize: number;
+    editingTab?: TabNode;
 }
 
 export interface IIcons {
@@ -108,21 +116,16 @@ export interface ILayoutCallbacks {
     ): void;
     customizeTab(
         tabNode: TabNode,
-        renderValues: {
-            leading: React.ReactNode;
-            content: React.ReactNode;
-            name: string;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabRenderValues,
     ): void;
     customizeTabSet(
         tabSetNode: TabSetNode | BorderNode,
-        renderValues: {
-            headerContent?: React.ReactNode;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabSetRenderValues,
     ): void;
     styleFont: (style: Record<string, string>) => Record<string, string>;
+    setEditingTab(tabNode?: TabNode): void;
+    getEditingTab(): TabNode | undefined;
+
 }
 
 // Popout windows work in latest browsers based on webkit (Chrome, Opera, Safari, latest Edge) and Firefox. They do
@@ -195,7 +198,10 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
     private popoutURL: string;
     /** @hidden @internal */
     private icons?: IIcons;
+    /** @hidden @internal */
     private firstRender: boolean;
+    /** @hidden @internal */
+    private resizeObserver? : ResizeObserver;
 
     constructor(props: ILayoutProps) {
         super(props);
@@ -211,7 +217,12 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
         this.icons = props.closeIcon ? Object.assign({ close: props.closeIcon }, props.icons) : props.icons;
         this.firstRender = true;
 
-        this.state = { rect: new Rect(0, 0, 0, 0), calculatedHeaderBarSize: 25, calculatedTabBarSize: 26, calculatedBorderBarSize: 30 };
+        this.state = { rect: new Rect(0, 0, 0, 0), 
+            calculatedHeaderBarSize: 25, 
+            calculatedTabBarSize: 26, 
+            calculatedBorderBarSize: 30,
+            editingTab: undefined,
+        };
 
         this.onDragEnter = this.onDragEnter.bind(this);
     }
@@ -264,12 +275,14 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
         // need to re-render if size changes
         this.currentDocument = (this.selfRef.current as HTMLDivElement).ownerDocument;
         this.currentWindow = this.currentDocument.defaultView!;
-        this.currentWindow!.addEventListener("resize", this.updateRect);
+        this.resizeObserver = new ResizeObserver(entries => {
+            this.updateRect();
+        });
+        this.resizeObserver.observe(this.selfRef.current!);
     }
 
     /** @hidden @internal */
     componentDidUpdate() {
-        this.updateRect();
         this.updateLayoutMetrics();
         if (this.props.model !== this.previousModel) {
             if (this.previousModel !== undefined) {
@@ -348,7 +361,17 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
 
     /** @hidden @internal */
     componentWillUnmount() {
-        this.currentWindow!.removeEventListener("resize", this.updateRect);
+        this.resizeObserver?.unobserve(this.selfRef.current!)
+    }
+
+    /** @hidden @internal */
+    setEditingTab(tabNode?: TabNode) {
+        this.setState({editingTab:tabNode});
+    }
+
+    /** @hidden @internal */
+    getEditingTab() {
+        return this.state.editingTab;
     }
 
     /** @hidden @internal */
@@ -839,12 +862,7 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
     /** @hidden @internal */
     customizeTab(
         tabNode: TabNode,
-        renderValues: {
-            leading: React.ReactNode;
-            content: React.ReactNode;
-            name: string;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabRenderValues,
     ) {
         if (this.props.onRenderTab) {
             this.props.onRenderTab(tabNode, renderValues);
@@ -854,10 +872,7 @@ export class Layout extends React.Component<ILayoutProps, ILayoutState> {
     /** @hidden @internal */
     customizeTabSet(
         tabSetNode: TabSetNode | BorderNode,
-        renderValues: {
-            headerContent?: React.ReactNode;
-            buttons: React.ReactNode[];
-        }
+        renderValues: ITabSetRenderValues,
     ) {
         if (this.props.onRenderTabSet) {
             this.props.onRenderTabSet(tabSetNode, renderValues);
